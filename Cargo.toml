@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "nexus-cri",
+    "nexus-memory-mapper",
+    "nexus-vsock-agent",
+]
+resolver = "2"

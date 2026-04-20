@@ -1,0 +1,28 @@
+# Rust / Cargo
+target/
+**/*.rs.bk
+*.pdb
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Thumbs.db:encrypt
+
+# Environment
+.env
+.env.local
+
+# Gemini CLI / AI agents
+.gemini/
