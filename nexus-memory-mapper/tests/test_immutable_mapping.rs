@@ -1,7 +1,6 @@
 use nexus_memory_mapper::map_secret_read_only;
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
 
 #[test]
 fn test_mmap_secret_is_zero_copy_and_readonly() {
@@ -16,13 +15,23 @@ fn test_mmap_secret_is_zero_copy_and_readonly() {
     file.sync_all().expect("failed to sync secret file");
 
     // b. It must pass the file's path to map_secret_read_only
-    // c. It must assert that the returned memory slice matches the bytes
-    let mapped_slice = map_secret_read_only(&temp_path);
+    let result = map_secret_read_only(&temp_path);
 
-    assert_eq!(
-        mapped_slice, secret_content,
-        "Mapped memory content does not match dummy secret"
-    );
+    #[cfg(unix)]
+    {
+        let mapped_slice = result.expect("failed to map secret");
+        // c. It must assert that the returned memory slice matches the bytes
+        assert_eq!(
+            &*mapped_slice, secret_content,
+            "Mapped memory content does not match dummy secret"
+        );
+    }
+
+    #[cfg(not(unix))]
+    {
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::Unsupported);
+    }
 
     // Cleanup
     let _ = fs::remove_file(&temp_path);
