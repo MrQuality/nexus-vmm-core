@@ -25,3 +25,6 @@ This module is responsible for managing memory allocations and providing high-pe
 **Technology Stack:** Rust (Static compilation), `AF_VSOCK`.
 **Description:**
 In the absence of a traditional container runtime within the guest VM, standard Kubelet `ExecSync` commands would normally fail. To resolve this 'ExecSync' void, `nexus-vsock-agent` is deployed as a statically compiled micro-agent running inside the guest VM. When the Kubelet issues an `ExecSync` call, the `nexus-cri` shim intercepts, serializes, and tunnels the request directly to this agent over an `AF_VSOCK` connection. The agent then executes the command natively within the guest and tunnels the output back to the host, ensuring seamless Kubernetes compatibility without a container layer.
+
+## Limitations & Future Work
+The v0.1 prototype strictly targets Linux Guest VMs. The architecture of the `nexus-vsock-agent` relies on `AF_VSOCK` via POSIX `libc` bindings, which are structurally incompatible with Windows-native guests without a transition to Hyper-V Sockets (`AF_HYPERV`) or `virtio-win` drivers. Additionally, the current `ExecSync` execution layer defaults to POSIX shell semantics; supporting Windows guests would require refactoring the agent to route commands through `cmd.exe` or `powershell.exe`. Support for non-Linux guests remains out of scope for the initial prototype.
