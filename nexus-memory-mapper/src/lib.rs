@@ -1,3 +1,5 @@
+#![cfg(target_os = "linux")]
+
 //! Nexus Memory Mapper
 //!
 //! This module implements ADR-002: Immutable Memory Mapping for

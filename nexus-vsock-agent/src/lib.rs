@@ -1,4 +1,7 @@
+#![cfg(target_os = "linux")]
+
 use serde::{Deserialize, Serialize};
+use std::os::unix::process::ExitStatusExt;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::process::Command;
 
@@ -49,6 +52,15 @@ where
     // For the prototype, we return the raw stdout bytes as requested.
     // The prompt says: "Write the stdout bytes back to the stream."
     stream.write_all(&output.stdout).await?;
+
+    if let Some(code) = output.status.code() {
+        stream.write_all(&[3]).await?;
+        stream.write_all(&(code as u32).to_be_bytes()).await?;
+    } else if let Some(signal) = output.status.signal() {
+        stream.write_all(&[4]).await?;
+        stream.write_all(&(signal as u32).to_be_bytes()).await?;
+    }
+
     stream.flush().await?;
 
     Ok(())
