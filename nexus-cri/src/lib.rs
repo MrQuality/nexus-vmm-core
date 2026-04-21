@@ -40,7 +40,10 @@ impl NexusCriService {
     async fn execute_cni_setup(&self, sandbox_id: &str) -> Result<(), String> {
         let mut cmd = if cfg!(windows) {
             let mut c = Command::new("cmd");
-            c.args(["/C", "timeout /T 1 /NOBREAK > NUL & echo {\"ip\":\"10.0.0.2\"}"]);
+            c.args([
+                "/C",
+                "timeout /T 1 /NOBREAK > NUL & echo {\"ip\":\"10.0.0.2\"}",
+            ]);
             c
         } else {
             let mut c = Command::new("sh");
@@ -49,10 +52,10 @@ impl NexusCriService {
         };
 
         cmd.env("CNI_COMMAND", "ADD")
-           .env("CNI_CONTAINERID", sandbox_id)
-           .env("CNI_NETNS", format!("/var/run/netns/{}", sandbox_id))
-           .env("CNI_IFNAME", "eth0")
-           .env("CNI_PATH", "/opt/cni/bin");
+            .env("CNI_CONTAINERID", sandbox_id)
+            .env("CNI_NETNS", format!("/var/run/netns/{}", sandbox_id))
+            .env("CNI_IFNAME", "eth0")
+            .env("CNI_PATH", "/opt/cni/bin");
 
         let output = cmd
             .output()
@@ -68,7 +71,9 @@ impl NexusCriService {
         let json_str = &stdout_str[start..];
 
         let path = format!("/var/lib/nexus/sandboxes/{}.json", sandbox_id);
-        tokio::fs::create_dir_all("/var/lib/nexus/sandboxes/").await.ok();
+        tokio::fs::create_dir_all("/var/lib/nexus/sandboxes/")
+            .await
+            .ok();
         tokio::fs::write(&path, json_str.as_bytes())
             .await
             .map_err(|e| format!("Failed to write CNI state: {}", e))?;
@@ -77,21 +82,14 @@ impl NexusCriService {
     }
 
     pub async fn teardown_cni_network(&self, sandbox_id: &str) -> Result<(), String> {
-        let mut cmd = if cfg!(windows) {
-            let mut c = Command::new("cmd");
-            c.args(["/C", "timeout /T 1 /NOBREAK > NUL"]);
-            c
-        } else {
-            let mut c = Command::new("sh");
-            c.args(["-c", "sleep 1"]);
-            c
-        };
+        let mut cmd = Command::new("sh");
+        cmd.args(["-c", "sleep 1"]);
 
         cmd.env("CNI_COMMAND", "DEL")
-           .env("CNI_CONTAINERID", sandbox_id)
-           .env("CNI_NETNS", format!("/var/run/netns/{}", sandbox_id))
-           .env("CNI_IFNAME", "eth0")
-           .env("CNI_PATH", "/opt/cni/bin");
+            .env("CNI_CONTAINERID", sandbox_id)
+            .env("CNI_NETNS", format!("/var/run/netns/{}", sandbox_id))
+            .env("CNI_IFNAME", "eth0")
+            .env("CNI_PATH", "/opt/cni/bin");
 
         let status = cmd
             .status()
