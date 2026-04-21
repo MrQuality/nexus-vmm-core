@@ -1,7 +1,7 @@
 #![cfg(unix)]
 
-use nexus_vsock_agent::{handle_exec_connection, ExecSyncRequest};
-use tokio::io::{duplex, AsyncReadExt, AsyncWriteExt};
+use nexus_vsock_agent::{ExecSyncRequest, handle_exec_connection};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, duplex};
 
 /// The Contract: Establishing the failing test for AF_VSOCK ExecSync tunneling.
 ///
@@ -33,26 +33,45 @@ async fn test_execsync_vsock_tunneling() {
         .write_all(&payload)
         .await
         .expect("Failed to write to stream");
-    
+
     // Host side: Read response
     let mut response_buffer = Vec::new();
-    host_side.read_to_end(&mut response_buffer).await.expect("Failed to read from stream");
+    host_side
+        .read_to_end(&mut response_buffer)
+        .await
+        .expect("Failed to read from stream");
 
-    let stdout_len = response_buffer.len().saturating_sub(5);
-    let stdout = &response_buffer[..stdout_len];
-    let stream_id = response_buffer.get(stdout_len).copied();
+    let mut cursor = 0;
+    let mut stdout_data = Vec::new();
+    let mut final_id = None;
 
-    let response_str = String::from_utf8_lossy(stdout);
-    
+    while cursor < response_buffer.len() {
+        let stream_id = response_buffer[cursor];
+        cursor += 1;
+
+        if stream_id == 3 || stream_id == 4 {
+            final_id = Some(stream_id);
+            break;
+        } else if stream_id == 1 || stream_id == 2 {
+            let len_bytes: [u8; 4] = response_buffer[cursor..cursor + 4].try_into().unwrap();
+            let len = u32::from_be_bytes(len_bytes) as usize;
+            cursor += 4;
+            if stream_id == 1 {
+                stdout_data.extend_from_slice(&response_buffer[cursor..cursor + len]);
+            }
+            cursor += len;
+        } else {
+            panic!("Invalid StreamID: {}", stream_id);
+        }
+    }
+
+    let response_str = String::from_utf8_lossy(&stdout_data);
     println!("Response: {:?}", response_str);
     assert!(
         !response_str.is_empty(),
         "Expected non-empty response from 'hostname'"
     );
-
-    if let Some(id) = stream_id {
-        assert!(id == 3 || id == 4, "Expected StreamID 3 or 4");
-    }
+    assert!(final_id.is_some(), "Expected StreamID 3 or 4 terminator");
 
     handler.await.expect("Handler task panicked");
 }
