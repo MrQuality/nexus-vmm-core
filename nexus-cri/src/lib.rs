@@ -38,18 +38,8 @@ impl NexusCriService {
 
     /// Internal CNI execution logic using tokio reactor.
     async fn execute_cni_setup(&self, sandbox_id: &str) -> Result<(), String> {
-        let mut cmd = if cfg!(windows) {
-            let mut c = Command::new("cmd");
-            c.args([
-                "/C",
-                "timeout /T 1 /NOBREAK > NUL & echo {\"ip\":\"10.0.0.2\"}",
-            ]);
-            c
-        } else {
-            let mut c = Command::new("sh");
-            c.args(["-c", "sleep 1 && echo '{\"ip\":\"10.0.0.2\"}'"]);
-            c
-        };
+        let mut cmd = tokio::process::Command::new("sh");
+        cmd.args(["-c", "sleep 1 && echo '{\"ip\":\"10.0.0.2\"}'"]);
 
         cmd.env("CNI_COMMAND", "ADD")
             .env("CNI_CONTAINERID", sandbox_id)

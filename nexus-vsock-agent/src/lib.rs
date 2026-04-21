@@ -44,6 +44,7 @@ where
         cmd.args(&request.command[1..]);
     }
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.kill_on_drop(true);
 
     unsafe {
         cmd.pre_exec(|| {
@@ -92,35 +93,35 @@ where
         }
     });
 
+    // 1. Drop the main task's clone of the sender so the channel can close
     drop(tx);
 
-    loop {
-        tokio::select! {
-            frame_opt = rx.recv() => {
-                match frame_opt {
-                    Some(frame) => {
-                        if stream.write_all(&frame).await.is_err() {
-                            let _ = child.kill().await;
-                            break;
-                        }
-                    }
-                    None => break,
-                }
-            }
+    // 2. Loop UNTIL the channel is completely empty (all producers dropped).
+    // This guarantees zero data loss before we await the process exit.
+    while let Some(chunk) = rx.recv().await {
+        if let Err(e) = stream.write_all(&chunk).await {
+            eprintln!("Socket disconnected before all logs were drained: {}", e);
+            return Err(e); // Dropping here triggers kill_on_drop
         }
     }
 
+    // 3. ONLY after the logs are fully drained to the socket, await the final status.
     let status = child.wait().await?;
-    let mut final_frame = Vec::with_capacity(5);
 
+    // 4. Send the Exit Code TLV (StreamID 3) or Signal TLV (StreamID 4)
+    // Strictly format with Length (4 bytes) to adhere to TLV constraints.
     if let Some(code) = status.code() {
-        final_frame.push(3);
-        final_frame.extend_from_slice(&(code as u32).to_be_bytes());
-    } else if let Some(sig) = status.signal() {
-        final_frame.push(4);
-        final_frame.extend_from_slice(&(sig as u32).to_be_bytes());
+        let mut exit_frame = vec![3u8]; // StreamID = 3
+        exit_frame.extend_from_slice(&4u32.to_be_bytes()); // Length = 4 bytes
+        exit_frame.extend_from_slice(&(code as u32).to_be_bytes()); // Payload
+        let _ = stream.write_all(&exit_frame).await;
+    } else if let Some(signal) = status.signal() {
+        let mut sig_frame = vec![4u8]; // StreamID = 4
+        sig_frame.extend_from_slice(&4u32.to_be_bytes()); // Length = 4 bytes
+        sig_frame.extend_from_slice(&(signal as u32).to_be_bytes()); // Payload
+        let _ = stream.write_all(&sig_frame).await;
     }
 
-    let _ = stream.write_all(&final_frame).await;
+    let _ = stream.flush().await;
     Ok(())
 }
