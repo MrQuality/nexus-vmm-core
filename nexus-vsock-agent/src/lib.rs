@@ -1,7 +1,7 @@
 #![cfg(target_os = "linux")]
 
 use serde::{Deserialize, Serialize};
-use std::os::unix::process::ExitStatusExt;
+use std::os::unix::process::{CommandExt, ExitStatusExt};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::process::Command;
 
@@ -45,6 +45,13 @@ where
     let mut cmd = Command::new(&request.command[0]);
     if request.command.len() > 1 {
         cmd.args(&request.command[1..]);
+    }
+
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL);
+            Ok(())
+        });
     }
 
     let output = cmd.output().await?;
