@@ -14,3 +14,5 @@ We dictate that these resources must be mapped directly into the guest VM's memo
 
 ## Consequences
 This approach ensures near bare-metal read performance for configuration and secret data. However, it requires absolute enforcement of immutability. The guest VM cannot alter these mounted resources, and any dynamic updates to ConfigMaps or Secrets will necessitate either a re-mapping event coordinated by the memory mapper or a recreation of the VM instance, depending on the lifecycle policies enforced by `nexus-cri`.
+
+To prevent guest DAX driver panics, the VMM device model MUST advertise the `virtio-pmem` PCI device with the strict Read-Only feature bit enabled, mirroring the `KVM_MEM_READONLY` host lock.
