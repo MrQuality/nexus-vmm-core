@@ -12,13 +12,6 @@ pub struct ExecSyncRequest {
     pub command: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ExecSyncResponse {
-    pub stdout: String,
-    pub stderr: String,
-    pub exit_code: i32,
-}
-
 pub async fn handle_exec_connection<T>(mut stream: T) -> std::io::Result<()>
 where
     T: AsyncRead + AsyncWrite + Unpin + Send + 'static,
